@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export interface PickResult {
   object: THREE.Mesh;
@@ -13,10 +14,14 @@ export class Viewer {
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
   readonly modelGroup: THREE.Group;
+  /** Ground grid, hidden for clean product renders. */
+  readonly grid: THREE.GridHelper;
+  /** Invisible plane that catches the key light's shadow. */
+  readonly shadowGround: THREE.Mesh;
 
   private raycaster = new THREE.Raycaster();
   private canvas: HTMLCanvasElement;
-  private grid: THREE.GridHelper;
+  private keyLight: THREE.DirectionalLight;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -27,22 +32,42 @@ export class Viewer {
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100000);
     this.camera.position.set(5, 4, 7);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // preserveDrawingBuffer keeps the frame readable for image export; alpha
+    // lets renders be saved with a transparent background.
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true,
+    });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Khronos PBR Neutral: rolls off highlights without shifting hues, so a
+    // surface still reads as the color the user picked.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.75;
+    pmrem.dispose();
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.12);
     this.scene.add(ambient);
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
-    key.position.set(5, 8, 6);
-    this.scene.add(key);
+    this.keyLight = new THREE.DirectionalLight(0xffffff, 1.9);
+    this.keyLight.position.set(5, 8, 6);
+    this.keyLight.castShadow = true;
+    this.keyLight.shadow.mapSize.set(2048, 2048);
+    this.scene.add(this.keyLight);
+    this.scene.add(this.keyLight.target);
 
-    const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
     fill.position.set(-6, -3, -4);
     this.scene.add(fill);
 
@@ -50,16 +75,32 @@ export class Viewer {
     this.grid.position.y = 0;
     this.scene.add(this.grid);
 
+    this.shadowGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.ShadowMaterial({ opacity: 0.42 }),
+    );
+    this.shadowGround.rotation.x = -Math.PI / 2;
+    this.shadowGround.receiveShadow = true;
+    this.scene.add(this.shadowGround);
+
     this.modelGroup = new THREE.Group();
     this.scene.add(this.modelGroup);
 
     window.addEventListener('resize', () => this.handleResize());
     this.handleResize();
 
+    this.startLoop();
+  }
+
+  startLoop(): void {
     this.renderer.setAnimationLoop(() => {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     });
+  }
+
+  stopLoop(): void {
+    this.renderer.setAnimationLoop(null);
   }
 
   handleResize(): void {
@@ -80,6 +121,12 @@ export class Viewer {
   }
 
   addModel(root: THREE.Object3D): void {
+    root.traverse((child: THREE.Object3D) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
     this.modelGroup.add(root);
   }
 
@@ -105,6 +152,33 @@ export class Viewer {
 
     this.grid.scale.setScalar(Math.max(radius / 10, 0.01) * 2);
     this.grid.position.y = box.min.y;
+
+    this.fitLighting(box, center, radius);
+  }
+
+  /** Directional-light shadows need a shadow camera sized to the model, and
+   * models here range from millimetre parts to metre-scale assemblies, so both
+   * the light rig and the shadow catcher are re-fitted whenever the scene
+   * changes. */
+  private fitLighting(box: THREE.Box3, center: THREE.Vector3, radius: number): void {
+    const keyDir = new THREE.Vector3(0.55, 1, 0.42).normalize();
+    this.keyLight.position.copy(center).addScaledVector(keyDir, radius * 4);
+    this.keyLight.target.position.copy(center);
+    this.keyLight.target.updateMatrixWorld();
+
+    const shadowCam = this.keyLight.shadow.camera;
+    const extent = radius * 1.15;
+    shadowCam.left = -extent;
+    shadowCam.right = extent;
+    shadowCam.top = extent;
+    shadowCam.bottom = -extent;
+    shadowCam.near = radius * 0.5;
+    shadowCam.far = radius * 8;
+    shadowCam.updateProjectionMatrix();
+    this.keyLight.shadow.normalBias = radius * 0.01;
+
+    this.shadowGround.position.set(center.x, box.min.y, center.z);
+    this.shadowGround.scale.setScalar(Math.max(radius * 8, 1e-6));
   }
 
   /** Raycast from a pointer event (client coords) against the model group. */

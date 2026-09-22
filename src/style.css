@@ -13,6 +13,12 @@
   box-sizing: border-box;
 }
 
+/* Class-based `display` on .popover/.modal would otherwise beat the user
+   agent's [hidden] rule and leave them covering the page. */
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -58,6 +64,10 @@ html, body {
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
@@ -67,6 +77,165 @@ html, body {
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0d1220;
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #6f9bff;
+}
+
+#topbar {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 16px;
+  width: 260px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popover-title {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.popover select {
+  background: #1f2126;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--accent);
+}
+
+.field-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 14, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 30;
+}
+
+.modal-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  max-width: min(90vw, 1000px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: #34363e;
+}
+
+/* Checkerboard so a transparent render reads as transparent. */
+.render-preview {
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #2a2c33;
+  background-image:
+    linear-gradient(45deg, #24262d 25%, transparent 25%),
+    linear-gradient(-45deg, #24262d 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #24262d 75%),
+    linear-gradient(-45deg, transparent 75%, #24262d 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  display: flex;
+}
+
+.render-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: auto;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 #main {

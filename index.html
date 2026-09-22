@@ -19,6 +19,45 @@
           <button id="reset-colors-btn" class="btn" disabled>Reset Colors</button>
           <button id="export-btn" class="btn" disabled>Export GLB</button>
           <button id="clear-scene-btn" class="btn" disabled>Clear Scene</button>
+          <button id="render-btn" class="btn btn-primary" disabled>Render Image</button>
+        </div>
+
+        <div id="render-panel" class="popover" hidden>
+          <h3 class="popover-title">Render Image</h3>
+          <label class="field">
+            <span class="field-label">Resolution</span>
+            <select id="render-res">
+              <option value="viewport:1">Viewport &times;1</option>
+              <option value="viewport:2" selected>Viewport &times;2</option>
+              <option value="viewport:4">Viewport &times;4</option>
+              <option value="fixed:1920:1080">1920 &times; 1080</option>
+              <option value="fixed:2560:1440">2560 &times; 1440</option>
+              <option value="fixed:3840:2160">3840 &times; 2160 (4K)</option>
+              <option value="fixed:2048:2048">2048 &times; 2048 (square)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Background</span>
+            <select id="render-bg">
+              <option value="studio-light" selected>Studio light</option>
+              <option value="studio-dark">Studio dark</option>
+              <option value="transparent">Transparent</option>
+              <option value="viewport">Match viewport</option>
+            </select>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="render-shadow" checked />
+            <span>Contact shadow</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="render-grid" />
+            <span>Show grid</span>
+          </label>
+          <p class="field-note" id="render-size-note"></p>
+          <div class="popover-actions">
+            <button class="btn" id="render-cancel">Cancel</button>
+            <button class="btn btn-primary" id="render-go">Render</button>
+          </div>
         </div>
       </header>
 
@@ -45,6 +84,23 @@
           <div id="surface-list" class="panel"></div>
         </aside>
       </main>
+
+      <div id="render-result" class="modal" hidden>
+        <div class="modal-card">
+          <div class="modal-head">
+            <h3 class="popover-title">Render</h3>
+            <button id="render-close" class="icon-btn" aria-label="Close">&#10005;</button>
+          </div>
+          <div class="render-preview"><img id="render-image" alt="Rendered image of the model" /></div>
+          <div class="modal-actions">
+            <span class="field-note" id="render-meta"></span>
+            <button id="render-download" class="btn btn-primary">Download PNG</button>
+          </div>
+          <p class="field-note" id="render-save-hint">
+            If the download doesn't start, right-click the image and choose "Save image as…".
+          </p>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
