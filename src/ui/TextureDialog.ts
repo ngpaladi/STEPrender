@@ -19,7 +19,7 @@ export class TextureDialog {
   private modeSelect = document.getElementById('texture-mode') as HTMLSelectElement;
   private scaleField = document.getElementById('texture-scale-field') as HTMLElement;
   private scaleInput = document.getElementById('texture-scale') as HTMLInputElement;
-  private rotationInput = document.getElementById('texture-rotation') as HTMLInputElement;
+  private rotationSelect = document.getElementById('texture-rotation') as HTMLSelectElement;
   private removeBtn = document.getElementById('texture-remove') as HTMLButtonElement;
 
   private thumbUrl: string | null = null;
@@ -52,7 +52,7 @@ export class TextureDialog {
 
     this.modeSelect.addEventListener('change', () => this.commitSettings());
     this.scaleInput.addEventListener('input', () => this.commitSettings());
-    this.rotationInput.addEventListener('input', () => this.commitSettings());
+    this.rotationSelect.addEventListener('change', () => this.commitSettings());
     this.removeBtn.addEventListener('click', () => {
       const selected = this.deps.getSelected();
       if (!selected) return;
@@ -88,7 +88,7 @@ export class TextureDialog {
     this.modeSelect.value = texture.mode;
     this.scaleField.hidden = texture.mode !== 'tile';
     this.scaleInput.value = String(roundForDisplay(texture.scale));
-    this.rotationInput.value = String(texture.rotation);
+    this.rotationSelect.value = String(snapToQuarterTurn(texture.rotation));
   }
 
   private async applyImage(file: File): Promise<void> {
@@ -113,8 +113,7 @@ export class TextureDialog {
     this.scaleField.hidden = texture.mode !== 'tile';
     const scale = parseFloat(this.scaleInput.value);
     if (Number.isFinite(scale) && scale > 0) texture.scale = scale;
-    const rotation = parseFloat(this.rotationInput.value);
-    texture.rotation = Number.isFinite(rotation) ? rotation : 0;
+    texture.rotation = snapToQuarterTurn(parseFloat(this.rotationSelect.value));
 
     this.deps.updateTransform(selected.surface);
   }
@@ -124,6 +123,12 @@ export class TextureDialog {
     this.thumbUrl = file ? URL.createObjectURL(file) : null;
     this.thumb.src = this.thumbUrl ?? '';
   }
+}
+
+/** Texture rotation is limited to quarter turns. */
+function snapToQuarterTurn(degrees: number): number {
+  if (!Number.isFinite(degrees)) return 0;
+  return ((Math.round(degrees / 90) * 90) % 360 + 360) % 360;
 }
 
 function roundForDisplay(value: number): number {
