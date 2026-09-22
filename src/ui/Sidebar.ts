@@ -97,6 +97,27 @@ export class Sidebar {
     badge.textContent = doc.kind.toUpperCase();
     header.appendChild(badge);
 
+    const partGroups: HTMLElement[] = [];
+    const collapseAllBtn = document.createElement('button');
+    collapseAllBtn.className = 'doc-collapse-all';
+    // A single part collapses from its own title row, so this only earns its
+    // place on an assembly.
+    collapseAllBtn.hidden = doc.parts.length < 2;
+    const syncCollapseAll = () => {
+      const allCollapsed = partGroups.every((el) => el.classList.contains('collapsed'));
+      collapseAllBtn.textContent = allCollapsed ? '⊞' : '⊟';
+      collapseAllBtn.title = allCollapsed
+        ? 'Expand all parts in this file'
+        : 'Collapse all parts in this file';
+    };
+    collapseAllBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const anyExpanded = partGroups.some((el) => !el.classList.contains('collapsed'));
+      for (const el of partGroups) el.classList.toggle('collapsed', anyExpanded);
+      syncCollapseAll();
+    });
+    header.appendChild(collapseAllBtn);
+
     const removeBtn = document.createElement('button');
     removeBtn.className = 'doc-remove';
     removeBtn.title = 'Remove this file from the scene';
@@ -115,10 +136,16 @@ export class Sidebar {
     const partsWrap = document.createElement('div');
     partsWrap.className = 'doc-parts';
     for (const part of doc.parts) {
-      partsWrap.appendChild(this.buildPartGroup(part));
+      const partGroup = this.buildPartGroup(part);
+      partGroups.push(partGroup);
+      partsWrap.appendChild(partGroup);
     }
+    // Collapsing parts one by one can leave the button's label stale; this
+    // fires after the part title's own handler has run.
+    partsWrap.addEventListener('click', () => syncCollapseAll());
     group.appendChild(partsWrap);
 
+    syncCollapseAll();
     return group;
   }
 

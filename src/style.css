@@ -434,7 +434,8 @@ html, body {
   flex-shrink: 0;
 }
 
-.doc-remove {
+.doc-remove,
+.doc-collapse-all {
   background: none;
   border: none;
   color: var(--text-dim);
@@ -443,6 +444,11 @@ html, body {
   padding: 2px 4px;
   border-radius: 4px;
   flex-shrink: 0;
+}
+
+.doc-collapse-all:hover {
+  color: var(--text);
+  background: #34363e;
 }
 
 .doc-remove:hover {
