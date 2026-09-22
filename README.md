@@ -36,8 +36,9 @@ runs locally in your browser.
   placed a file by hand, adding more files won't re-flow it. Esc exits.
 - **Image textures per surface**: select a surface, open "Texture" and choose
   an image. Either tile it at a chosen size in model units, or use full size
-  to fit exactly one copy to that surface. Each surface keeps its own image
-  and sizing, and textures show up in rendered images and GLB exports.
+  to fit exactly one copy to that surface, and turn it to any angle. Each
+  surface keeps its own image, sizing and rotation, and textures show up in
+  rendered images and GLB exports.
 - Reset to the original colors at any time.
 - **Render product images**: "Render Image" exports the current camera view as
   a PNG at up to 4K (or 1×/2×/4× the viewport for exact WYSIWYG framing), on a
@@ -106,6 +107,11 @@ its vertices onto a plane perpendicular to its (area-weighted) average normal.
 The projection is in model units, which lets both sizing modes be expressed
 purely as a texture transform: tiling divides by the tile size, full size
 divides by the surface's own extent and offsets it to the surface's origin.
+
+Rotation turns that projection basis rather than setting `texture.rotation`,
+so the extent is re-measured in the rotated frame. That is what keeps full
+size exact at any angle — spinning the image inside a fixed box would leave it
+overflowing on two sides and short on the other two.
 
 Writing UVs per surface is safe because each surface's vertices belong to it
 alone — OCCT meshes every face separately, and the STL loader reorders

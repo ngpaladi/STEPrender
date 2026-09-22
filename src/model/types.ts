@@ -5,6 +5,8 @@ export interface SurfaceTexture {
   mode: 'tile' | 'fit';
   /** Model units covered by one tile, in tile mode. */
   scale: number;
+  /** Degrees the image is turned on the surface. */
+  rotation: number;
   /** Planar projection extent of the surface, in model units. */
   minU: number;
   minV: number;

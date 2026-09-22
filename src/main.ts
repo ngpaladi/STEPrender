@@ -10,9 +10,9 @@ import { exportModelAsGlb } from './export/exportGlb';
 import { RenderDialog } from './ui/RenderDialog';
 import { TextureDialog } from './ui/TextureDialog';
 import {
-  applyTextureTransform,
   clearSurfaceTexture,
   loadTextureFromFile,
+  refreshSurfaceTexture,
   setSurfaceTexture,
 } from './texture/surfaceTexture';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
@@ -114,8 +114,8 @@ const textureDialog = new TextureDialog({
     sidebar.setSwatch(part.id, surface.materialIndex, '#ffffff');
   },
   updateTransform: (surface) => {
-    const map = surface.material.map;
-    if (map && surface.texture) applyTextureTransform(map, surface.texture);
+    const part = selectedSurface ? findPart(selectedSurface.partId) : undefined;
+    if (part) refreshSurfaceTexture(part.mesh, surface);
   },
   removeTexture: (surface) => {
     clearSurfaceTexture(surface);

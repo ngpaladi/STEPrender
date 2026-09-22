@@ -35,10 +35,18 @@ function triangleRanges(
     .map((group) => ({ first: group.start / 3, last: (group.start + group.count) / 3 }));
 }
 
-/** Writes UVs for one surface and returns the extent it occupies. */
+/**
+ * Writes UVs for one surface and returns the extent it occupies.
+ *
+ * Rotation turns the projection basis rather than using `texture.rotation`,
+ * so the extent is measured in the rotated frame. That keeps full-size mode
+ * exact at any angle — turning the image inside a fixed box would otherwise
+ * leave it overflowing on two sides and short on the other two.
+ */
 export function projectSurfaceUVs(
   mesh: THREE.Mesh,
   materialIndex: number,
+  rotationDegrees = 0,
 ): SurfaceProjection | null {
   const geometry = mesh.geometry;
   const position = geometry.getAttribute('position');
@@ -85,6 +93,14 @@ export function projectSurfaceUVs(
   if (Math.abs(normal.dot(axisU)) > 0.9) axisU.set(0, 1, 0);
   axisU.cross(normal).normalize();
   const axisV = new THREE.Vector3().crossVectors(normal, axisU).normalize();
+
+  if (rotationDegrees !== 0) {
+    // Negated so a positive angle turns the image the way it reads, rather
+    // than turning the frame the image is measured against.
+    const radians = -(rotationDegrees * Math.PI) / 180;
+    axisU.applyAxisAngle(normal, radians);
+    axisV.applyAxisAngle(normal, radians);
+  }
 
   let minU = Infinity;
   let maxU = -Infinity;
@@ -166,6 +182,7 @@ export function setSurfaceTexture(
     ...projection,
     mode: 'tile',
     scale: suggested > 0 ? suggested : 1,
+    rotation: 0,
     sourceName,
   };
 
@@ -177,6 +194,27 @@ export function setSurfaceTexture(
   surface.material.needsUpdate = true;
   applyTextureTransform(texture, surface.texture);
 }
+
+/**
+ * Re-applies a surface's texture settings after they change. The projection
+ * is only redone when the angle moved, since re-measuring every vertex on a
+ * dense surface is wasted work for a tile-size tweak.
+ */
+export function refreshSurfaceTexture(mesh: THREE.Mesh, surface: SurfaceInfo): void {
+  const state = surface.texture;
+  const map = surface.material.map;
+  if (!state || !map) return;
+
+  if (state.rotation !== appliedRotations.get(surface)) {
+    const projection = projectSurfaceUVs(mesh, surface.materialIndex, state.rotation);
+    if (projection) Object.assign(state, projection);
+    appliedRotations.set(surface, state.rotation);
+  }
+
+  applyTextureTransform(map, state);
+}
+
+const appliedRotations = new WeakMap<SurfaceInfo, number>();
 
 export function clearSurfaceTexture(surface: SurfaceInfo): void {
   surface.material.map?.dispose();
