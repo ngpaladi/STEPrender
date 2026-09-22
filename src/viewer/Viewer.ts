@@ -79,10 +79,8 @@ export class Viewer {
     }
   }
 
-  setModel(root: THREE.Object3D): void {
-    this.clearModel();
+  addModel(root: THREE.Object3D): void {
     this.modelGroup.add(root);
-    this.frameObject(root);
   }
 
   frameObject(object: THREE.Object3D): void {

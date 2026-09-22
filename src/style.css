@@ -204,6 +204,88 @@ html, body {
   padding: 2px 0;
 }
 
+.doc-group {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.doc-group:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.doc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+
+.doc-header:hover {
+  background: #2b2d34;
+}
+
+.doc-header .chevron {
+  transition: transform 0.15s;
+  color: var(--text-dim);
+  font-size: 11px;
+  width: 10px;
+  display: inline-block;
+}
+
+.doc-group.collapsed .chevron {
+  transform: rotate(-90deg);
+}
+
+.doc-group.collapsed .doc-parts {
+  display: none;
+}
+
+.doc-name {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.doc-badge {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: #34363e;
+  border-radius: 4px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+
+.doc-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.doc-remove:hover {
+  color: #ff8080;
+  background: #3a2020;
+}
+
+.doc-parts {
+  padding-left: 4px;
+  margin-top: 4px;
+}
+
 .part-group {
   margin-bottom: 10px;
 }

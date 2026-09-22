@@ -14,10 +14,11 @@
       <header id="topbar">
         <div class="brand">STEP / STL Viewer</div>
         <div class="topbar-actions">
-          <label class="btn" for="file-input">Open File</label>
-          <input id="file-input" type="file" accept=".step,.stp,.stl" hidden />
+          <label class="btn" for="file-input">Add File(s)</label>
+          <input id="file-input" type="file" accept=".step,.stp,.stl" multiple hidden />
           <button id="reset-colors-btn" class="btn" disabled>Reset Colors</button>
           <button id="export-btn" class="btn" disabled>Export GLB</button>
+          <button id="clear-scene-btn" class="btn" disabled>Clear Scene</button>
         </div>
       </header>
 
@@ -26,15 +27,15 @@
           <canvas id="viewport"></canvas>
           <div id="dropzone">
             <div id="dropzone-inner">
-              <p class="dz-title">Drop a STEP or STL file here</p>
-              <p class="dz-sub">.step &middot; .stp &middot; .stl &mdash; or click "Open File"</p>
+              <p class="dz-title">Drop STEP or STL files here</p>
+              <p class="dz-sub">.step &middot; .stp &middot; .stl &mdash; drop several at once to assemble them</p>
             </div>
           </div>
           <div id="loading-overlay" class="hidden">
             <div class="spinner"></div>
             <div id="loading-text">Loading…</div>
           </div>
-          <div id="hint">Click any surface on the model to recolor it</div>
+          <div id="hint">Click any surface to recolor it &middot; add more files to build up an assembly</div>
         </div>
 
         <aside id="sidebar">

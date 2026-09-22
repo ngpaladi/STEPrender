@@ -21,7 +21,12 @@ runs locally in your browser.
 - Multi-part STEP assemblies are listed part by part, each collapsible.
 - Reset to the original colors at any time.
 - Export the recolored model as a `.glb` (glTF binary) to use elsewhere.
-- Drag-and-drop or "Open File" to load a model.
+- Drag-and-drop or "Add File(s)" to load one or more models — select or drop
+  several files at once (or add them one at a time) to assemble them into a
+  single scene. Each file gets its own section in the sidebar with a remove
+  button, and files are laid out side by side automatically so they don't
+  overlap. "Clear Scene" empties the assembly; "Export GLB" exports
+  everything currently loaded as one combined file.
 
 ## Getting started
 
@@ -39,6 +44,20 @@ npm run preview   # serve the built dist/ folder locally
 
 The output in `dist/` is fully static (HTML/CSS/JS + a `.wasm` file) and can
 be hosted on any static file host — there is no server-side component.
+
+## Hosting on GitHub Pages
+
+A workflow at `.github/workflows/deploy.yml` builds the app and publishes
+`dist/` to GitHub Pages on every push to `main`. To enable it:
+
+1. In the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
+2. Push to `main` (or run the workflow manually from the **Actions** tab).
+3. The deployed URL appears in the workflow run summary and under
+   **Settings → Pages**, typically `https://<user>.github.io/<repo>/`.
+
+The build uses a relative base path (`vite.config.ts`'s `base: './'`), so it
+works whether the site is served from a domain root or a project subpath
+like `/STEPrender/` — no extra configuration needed.
 
 ## How surface detection works
 

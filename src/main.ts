@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import './style.css';
-import { Viewer } from './viewer/Viewer';
+import { Viewer, disposeObject3D } from './viewer/Viewer';
 import { Sidebar } from './ui/Sidebar';
 import { HighlightManager } from './ui/Highlight';
 import { loadStepFile } from './loaders/loadStep';
 import { loadStlFile } from './loaders/loadStl';
 import { exportModelAsGlb } from './export/exportGlb';
-import type { LoadedModel, SurfaceInfo } from './model/types';
+import type { SceneDocument, SurfaceInfo } from './model/types';
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
 const viewportWrap = document.getElementById('viewport-wrap') as HTMLElement;
@@ -16,13 +16,16 @@ const loadingOverlay = document.getElementById('loading-overlay') as HTMLElement
 const loadingText = document.getElementById('loading-text') as HTMLElement;
 const resetBtn = document.getElementById('reset-colors-btn') as HTMLButtonElement;
 const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
+const clearSceneBtn = document.getElementById('clear-scene-btn') as HTMLButtonElement;
 const modelInfoEl = document.getElementById('model-info') as HTMLElement;
 const surfaceListEl = document.getElementById('surface-list') as HTMLElement;
 
 const viewer = new Viewer(canvas);
 const highlight = new HighlightManager();
 
-let currentModel: LoadedModel | null = null;
+// The assembled scene: every file the user has added, kept side by side.
+let documents: SceneDocument[] = [];
+let docCounter = 0;
 const meshToPartId = new Map<THREE.Mesh, string>();
 
 const sidebar = new Sidebar(modelInfoEl, surfaceListEl, {
@@ -31,31 +34,30 @@ const sidebar = new Sidebar(modelInfoEl, surfaceListEl, {
     if (surface) surface.material.color.set(hex);
   },
   onSurfaceClick: (partId, materialIndex) => {
-    selectSurface(partId, materialIndex, false);
+    selectSurface(partId, materialIndex);
   },
   onPartColorAll: (partId, hex) => {
-    if (!currentModel) return;
-    const part = currentModel.parts.find((p) => p.id === partId);
+    const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
     if (!part) return;
     for (const surface of part.surfaces) {
       surface.material.color.set(hex);
     }
   },
+  onRemoveDocument: (docId) => {
+    removeDocument(docId);
+  },
 });
 
 function findSurface(partId: string, materialIndex: number): SurfaceInfo | undefined {
-  const part = currentModel?.parts.find((p) => p.id === partId);
+  const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
   return part?.surfaces.find((s) => s.materialIndex === materialIndex);
 }
 
-function selectSurface(partId: string, materialIndex: number, fromViewport: boolean): void {
+function selectSurface(partId: string, materialIndex: number): void {
   const surface = findSurface(partId, materialIndex);
   if (!surface) return;
   sidebar.select(partId, materialIndex);
   highlight.set(surface.material);
-  if (!fromViewport) {
-    // no camera movement needed; selection from the list is just a focus aid
-  }
 }
 
 function showError(message: string): void {
@@ -78,44 +80,120 @@ function setLoading(isLoading: boolean, text = 'Loading…'): void {
   loadingOverlay.classList.toggle('hidden', !isLoading);
 }
 
-async function handleFile(file: File): Promise<void> {
+function updateToolbarState(): void {
+  const hasDocs = documents.length > 0;
+  resetBtn.disabled = !hasDocs;
+  exportBtn.disabled = !hasDocs;
+  clearSceneBtn.disabled = !hasDocs;
+}
+
+/** Rebuilds the three.js scene and sidebar from the current `documents`
+ * list, and reframes the camera around everything that's loaded. */
+function rebuildScene(refreshSidebar = true): void {
+  layoutDocuments();
+  viewer.clearModel();
+  meshToPartId.clear();
+  for (const doc of documents) {
+    viewer.addModel(doc.root);
+    for (const part of doc.parts) {
+      meshToPartId.set(part.mesh, part.id);
+    }
+  }
+  viewer.frameObject(viewer.modelGroup);
+  if (refreshSidebar) sidebar.render(documents);
+  updateToolbarState();
+}
+
+/** Lines up every loaded file side by side along X, each resting on the
+ * ground plane, like parts laid out on a workbench, instead of letting
+ * unrelated files overlap at the origin. Recomputed from scratch on every
+ * change so removing a file closes the gap it left behind. */
+function layoutDocuments(): void {
+  let cursorX = 0;
+  for (const doc of documents) {
+    doc.root.position.set(0, 0, 0);
+    doc.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(doc.root);
+    if (box.isEmpty()) continue;
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const gap = Math.max(size.length() * 0.2, 1e-6);
+
+    doc.root.position.set(cursorX - box.min.x, -box.min.y, -center.z);
+    doc.root.updateMatrixWorld(true);
+    cursorX += size.x + gap;
+  }
+}
+
+function removeDocument(docId: string): void {
+  const doc = documents.find((d) => d.docId === docId);
+  if (!doc) return;
+  documents = documents.filter((d) => d.docId !== docId);
+  highlight.clear();
+  sidebar.clearSelection();
+  disposeObject3D(doc.root);
+  rebuildScene();
+}
+
+function clearScene(): void {
+  documents = [];
+  highlight.clear();
+  sidebar.clearSelection();
+  rebuildScene();
+}
+
+async function loadOneFile(file: File): Promise<SceneDocument | null> {
   const ext = file.name.toLowerCase().split('.').pop() ?? '';
   if (!['step', 'stp', 'stl'].includes(ext)) {
     showError(`Unsupported file type ".${ext}". Please choose a .step, .stp, or .stl file.`);
-    return;
+    return null;
   }
 
-  setLoading(true, ext === 'stl' ? 'Parsing STL…' : 'Parsing STEP geometry…');
+  const model = ext === 'stl' ? await loadStlFile(file) : await loadStepFile(file);
+  const docId = `doc-${docCounter++}`;
+  for (const part of model.parts) {
+    part.id = `${docId}::${part.id}`;
+  }
+  return { ...model, docId };
+}
+
+async function handleFiles(files: File[]): Promise<void> {
+  if (files.length === 0) return;
+
   highlight.clear();
   sidebar.clearSelection();
 
-  try {
-    const model = ext === 'stl' ? await loadStlFile(file) : await loadStepFile(file);
-
-    meshToPartId.clear();
-    for (const part of model.parts) {
-      meshToPartId.set(part.mesh, part.id);
+  let loadedAny = false;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    setLoading(
+      true,
+      files.length > 1
+        ? `Loading ${i + 1} of ${files.length}: ${file.name}`
+        : `Parsing ${file.name.toLowerCase().endsWith('.stl') ? 'STL' : 'STEP'} geometry…`,
+    );
+    try {
+      const doc = await loadOneFile(file);
+      if (doc) {
+        documents.push(doc);
+        loadedAny = true;
+      }
+    } catch (err) {
+      console.error(err);
+      showError(err instanceof Error ? err.message : `Failed to load ${file.name}.`);
     }
-
-    currentModel = model;
-    viewer.setModel(model.root);
-    sidebar.render(model);
-    resetBtn.disabled = false;
-    exportBtn.disabled = false;
-    dropzone.classList.remove('drag-active');
-  } catch (err) {
-    console.error(err);
-    showError(err instanceof Error ? err.message : 'Failed to load the file.');
-  } finally {
-    setLoading(false);
   }
+
+  setLoading(false);
+  dropzone.classList.remove('drag-active');
+  if (loadedAny) rebuildScene();
 }
 
 // --- file input / drag & drop -------------------------------------------
 
 fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  if (file) handleFile(file);
+  const files = fileInput.files ? Array.from(fileInput.files) : [];
+  if (files.length) handleFiles(files);
   fileInput.value = '';
 });
 
@@ -136,8 +214,8 @@ viewportWrap.addEventListener('drop', (e) => {
   e.preventDefault();
   dragDepth = 0;
   dropzone.classList.remove('drag-active');
-  const file = e.dataTransfer?.files?.[0];
-  if (file) handleFile(file);
+  const files = e.dataTransfer?.files ? Array.from(e.dataTransfer.files) : [];
+  if (files.length) handleFiles(files);
 });
 
 // --- click-to-select a surface in the viewport ---------------------------
@@ -159,7 +237,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (!hit) return;
   const partId = meshToPartId.get(hit.object);
   if (!partId) return;
-  selectSurface(partId, hit.materialIndex, true);
+  selectSurface(partId, hit.materialIndex);
 });
 
 let hoverPending = false;
@@ -168,7 +246,7 @@ canvas.addEventListener('pointermove', (e) => {
   hoverPending = true;
   requestAnimationFrame(() => {
     hoverPending = false;
-    if (!currentModel) return;
+    if (documents.length === 0) return;
     const hit = viewer.pick(e.clientX, e.clientY);
     canvas.style.cursor = hit ? 'pointer' : '';
   });
@@ -177,23 +255,24 @@ canvas.addEventListener('pointermove', (e) => {
 // --- toolbar actions ------------------------------------------------------
 
 resetBtn.addEventListener('click', () => {
-  if (!currentModel) return;
-  for (const part of currentModel.parts) {
-    for (const surface of part.surfaces) {
-      surface.material.color.copy(surface.originalColor);
-      sidebar.setSwatch(part.id, surface.materialIndex, `#${surface.originalColor.getHexString()}`);
+  for (const doc of documents) {
+    for (const part of doc.parts) {
+      for (const surface of part.surfaces) {
+        surface.material.color.copy(surface.originalColor);
+        sidebar.setSwatch(part.id, surface.materialIndex, `#${surface.originalColor.getHexString()}`);
+      }
     }
   }
 });
 
 exportBtn.addEventListener('click', async () => {
-  if (!currentModel) return;
+  if (documents.length === 0) return;
   exportBtn.disabled = true;
   const prevLabel = exportBtn.textContent;
   exportBtn.textContent = 'Exporting…';
   try {
-    const baseName = currentModel.fileName.replace(/\.[^./]+$/, '');
-    await exportModelAsGlb(currentModel.root, baseName);
+    const baseName = documents.length === 1 ? documents[0].fileName.replace(/\.[^./]+$/, '') : 'assembly';
+    await exportModelAsGlb(viewer.modelGroup, baseName);
   } catch (err) {
     console.error(err);
     showError('Failed to export the model.');
@@ -201,6 +280,10 @@ exportBtn.addEventListener('click', async () => {
     exportBtn.disabled = false;
     exportBtn.textContent = prevLabel ?? 'Export GLB';
   }
+});
+
+clearSceneBtn.addEventListener('click', () => {
+  clearScene();
 });
 
 sidebar.showEmpty();

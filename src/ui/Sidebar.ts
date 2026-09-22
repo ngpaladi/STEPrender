@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { LoadedModel, PartInfo } from '../model/types';
+import type { PartInfo, SceneDocument } from '../model/types';
 
 export type SurfaceKey = string; // `${partId}:${materialIndex}`
 
@@ -11,6 +11,7 @@ export interface SidebarCallbacks {
   onSurfaceColorInput: (partId: string, materialIndex: number, hex: string) => void;
   onSurfaceClick: (partId: string, materialIndex: number) => void;
   onPartColorAll: (partId: string, hex: string) => void;
+  onRemoveDocument: (docId: string) => void;
 }
 
 export class Sidebar {
@@ -36,22 +37,30 @@ export class Sidebar {
     this.selectedKey = null;
   }
 
-  render(model: LoadedModel): void {
+  render(documents: SceneDocument[]): void {
     this.swatchInputs.clear();
     this.rowEls.clear();
     this.selectedKey = null;
 
     this.infoEl.innerHTML = '';
+    if (documents.length === 0) {
+      this.showEmpty();
+      return;
+    }
+
     const title = document.createElement('h3');
-    title.textContent = 'Model';
+    title.textContent = 'Scene';
     this.infoEl.appendChild(title);
 
+    const totalParts = documents.reduce((n, d) => n + d.parts.length, 0);
+    const totalSurfaces = documents.reduce((n, d) => n + d.parts.reduce((m, p) => m + p.surfaces.length, 0), 0);
+    const totalTriangles = documents.reduce((n, d) => n + d.triangleCount, 0);
+
     const rows: [string, string][] = [
-      ['File', model.fileName],
-      ['Format', model.kind.toUpperCase()],
-      ['Parts', String(model.parts.length)],
-      ['Surfaces', String(model.parts.reduce((n, p) => n + p.surfaces.length, 0))],
-      ['Triangles', model.triangleCount.toLocaleString()],
+      ['Files', String(documents.length)],
+      ['Parts', String(totalParts)],
+      ['Surfaces', String(totalSurfaces)],
+      ['Triangles', totalTriangles.toLocaleString()],
     ];
     for (const [label, value] of rows) {
       const row = document.createElement('div');
@@ -61,9 +70,56 @@ export class Sidebar {
     }
 
     this.listEl.innerHTML = '';
-    for (const part of model.parts) {
-      this.listEl.appendChild(this.buildPartGroup(part));
+    for (const doc of documents) {
+      this.listEl.appendChild(this.buildDocGroup(doc));
     }
+  }
+
+  private buildDocGroup(doc: SceneDocument): HTMLElement {
+    const group = document.createElement('div');
+    group.className = 'doc-group';
+
+    const header = document.createElement('div');
+    header.className = 'doc-header';
+
+    const chevron = document.createElement('span');
+    chevron.className = 'chevron';
+    chevron.textContent = '▾';
+    header.appendChild(chevron);
+
+    const name = document.createElement('span');
+    name.className = 'doc-name';
+    name.textContent = doc.fileName;
+    header.appendChild(name);
+
+    const badge = document.createElement('span');
+    badge.className = 'doc-badge';
+    badge.textContent = doc.kind.toUpperCase();
+    header.appendChild(badge);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'doc-remove';
+    removeBtn.title = 'Remove this file from the scene';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onRemoveDocument(doc.docId);
+    });
+    header.appendChild(removeBtn);
+
+    header.addEventListener('click', () => {
+      group.classList.toggle('collapsed');
+    });
+    group.appendChild(header);
+
+    const partsWrap = document.createElement('div');
+    partsWrap.className = 'doc-parts';
+    for (const part of doc.parts) {
+      partsWrap.appendChild(this.buildPartGroup(part));
+    }
+    group.appendChild(partsWrap);
+
+    return group;
   }
 
   private buildPartGroup(part: PartInfo): HTMLElement {

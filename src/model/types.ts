@@ -26,3 +26,10 @@ export interface LoadedModel {
   parts: PartInfo[];
   triangleCount: number;
 }
+
+/** A LoadedModel that has been added to the assembled scene. Part ids are
+ * namespaced with the document id so surfaces stay addressable even when
+ * several files (or the same file twice) are loaded together. */
+export interface SceneDocument extends LoadedModel {
+  docId: string;
+}
