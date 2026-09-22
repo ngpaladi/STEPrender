@@ -5,12 +5,13 @@ import { Sidebar } from './ui/Sidebar';
 import { HighlightManager } from './ui/Highlight';
 import { loadStepFile } from './loaders/loadStep';
 import { loadStlFile } from './loaders/loadStl';
+import { loadGlbFile } from './loaders/loadGlb';
 import { exportModelAsGlb } from './export/exportGlb';
 import { exportSceneAsStep } from './export/exportStep';
 import { RenderDialog } from './ui/RenderDialog';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
 import { recenterDocumentOnItself } from './model/recenter';
-import type { SceneDocument, SurfaceInfo } from './model/types';
+import type { LoadedModel, SceneDocument, SurfaceInfo } from './model/types';
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
 const viewportWrap = document.getElementById('viewport-wrap') as HTMLElement;
@@ -235,19 +236,27 @@ function clearScene(): void {
   rebuildScene();
 }
 
+const LOADERS: Record<string, (file: File) => Promise<LoadedModel>> = {
+  step: loadStepFile,
+  stp: loadStepFile,
+  stl: loadStlFile,
+  glb: loadGlbFile,
+};
+
 async function loadOneFile(file: File): Promise<SceneDocument | null> {
   const ext = file.name.toLowerCase().split('.').pop() ?? '';
-  if (!['step', 'stp', 'stl'].includes(ext)) {
-    showError(`Unsupported file type ".${ext}". Please choose a .step, .stp, or .stl file.`);
+  const load = LOADERS[ext];
+  if (!load) {
+    showError(`Unsupported file type ".${ext}". Please choose a .step, .stp, .stl, or .glb file.`);
     return null;
   }
 
-  const model = ext === 'stl' ? await loadStlFile(file) : await loadStepFile(file);
+  const model = await load(file);
   const docId = `doc-${docCounter++}`;
   for (const part of model.parts) {
     part.id = `${docId}::${part.id}`;
   }
-  recenterDocumentOnItself(model.root, model.parts);
+  recenterDocumentOnItself(model.root);
   return { ...model, docId };
 }
 
@@ -264,7 +273,7 @@ async function handleFiles(files: File[]): Promise<void> {
       true,
       files.length > 1
         ? `Loading ${i + 1} of ${files.length}: ${file.name}`
-        : `Parsing ${file.name.toLowerCase().endsWith('.stl') ? 'STL' : 'STEP'} geometry…`,
+        : `Parsing ${file.name}…`,
     );
     try {
       const doc = await loadOneFile(file);

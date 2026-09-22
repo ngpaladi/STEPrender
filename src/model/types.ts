@@ -20,7 +20,7 @@ export interface PartInfo {
 }
 
 export interface LoadedModel {
-  kind: 'step' | 'stl';
+  kind: 'step' | 'stl' | 'glb';
   fileName: string;
   root: THREE.Object3D;
   parts: PartInfo[];

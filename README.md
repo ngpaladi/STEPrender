@@ -1,6 +1,6 @@
 # STEP/STL Viewer
 
-A frontend-only, browser-based 3D viewer for STEP and STL files. Drop in a
+A frontend-only, browser-based 3D viewer for STEP, STL and GLB files. Drop in a
 model, click any surface, and recolor it — no backend, no upload, everything
 runs locally in your browser.
 
@@ -9,6 +9,11 @@ runs locally in your browser.
 - **STEP (.step/.stp)** parsing via [occt-import-js](https://github.com/kovacsv/occt-import-js)
   (OpenCascade compiled to WebAssembly), which preserves true per-face
   boundaries and any colors baked into the file.
+- **glTF binary (.glb)** import, which also reads back what this app exports.
+  glTF carries its own materials, so those are kept as-is rather than
+  re-deriving surfaces from the geometry — each mesh becomes a part, and a
+  mesh with several materials exposes one surface per material. Compressed
+  glTF (Draco, KTX2) isn't supported and reports a clear error.
 - **STL (.stl)** parsing (ASCII and binary), with automatic surface
   detection: adjacent triangles are grouped into a "surface" when they share
   an edge and their normals stay within an angle threshold of each other —
@@ -39,7 +44,7 @@ runs locally in your browser.
 - **Export STEP**: writes everything loaded as one combined `.step` file with
   the per-surface colors and your arrangement baked in. Note the tradeoff
   below — the geometry is faceted.
-- Drag-and-drop or "Add File(s)" to load one or more models — select or drop
+- Drag-and-drop or "Add File(s)" to load one or more models (.step/.stp/.stl/.glb) — select or drop
   several files at once (or add them one at a time) to assemble them into a
   single scene. Each file gets its own section in the sidebar with a remove
   button, and files are laid out side by side automatically so they don't
@@ -127,5 +132,5 @@ and to 40 megapixels.
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) + TypeScript
-- [three.js](https://threejs.org/) for rendering (`OrbitControls`, `STLLoader`, `GLTFExporter`)
+- [three.js](https://threejs.org/) for rendering (`OrbitControls`, `TransformControls`, `STLLoader`, `GLTFLoader`, `GLTFExporter`)
 - [occt-import-js](https://github.com/kovacsv/occt-import-js) for STEP parsing

@@ -15,7 +15,7 @@
         <div class="brand">STEP / STL Viewer</div>
         <div class="topbar-actions">
           <label class="btn" for="file-input">Add File(s)</label>
-          <input id="file-input" type="file" accept=".step,.stp,.stl" multiple hidden />
+          <input id="file-input" type="file" accept=".step,.stp,.stl,.glb" multiple hidden />
           <button id="pan-btn" class="btn" title="Drag to pan the view instead of orbiting">Pan</button>
           <button id="fit-btn" class="btn" disabled title="Frame everything in the scene">Fit</button>
           <button id="move-btn" class="btn" disabled title="Drag to move a whole file">Move</button>
@@ -71,8 +71,8 @@
           <canvas id="viewport"></canvas>
           <div id="dropzone">
             <div id="dropzone-inner">
-              <p class="dz-title">Drop STEP or STL files here</p>
-              <p class="dz-sub">.step &middot; .stp &middot; .stl &mdash; drop several at once to assemble them</p>
+              <p class="dz-title">Drop STEP, STL or GLB files here</p>
+              <p class="dz-sub">.step &middot; .stp &middot; .stl &middot; .glb &mdash; drop several at once to assemble them</p>
             </div>
           </div>
           <div id="loading-overlay" class="hidden">
