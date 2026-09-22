@@ -198,6 +198,11 @@ export class Viewer {
 
   attachGizmo(object: THREE.Object3D, mode: 'translate' | 'rotate'): void {
     this.transformControls.setMode(mode);
+    // Rotation snaps to 45° steps (so 90° and 180° land exactly); position
+    // stays free. The snap applies to the angle turned during a drag, and
+    // files start unrotated, so orientations stay on clean multiples.
+    this.transformControls.translationSnap = null;
+    this.transformControls.rotationSnap = mode === 'rotate' ? Math.PI / 4 : null;
     this.transformControls.attach(object);
     this.transformHelper.visible = true;
   }

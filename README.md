@@ -21,9 +21,9 @@ runs locally in your browser.
 - Multi-part STEP assemblies are listed part by part, each collapsible.
 - **Move and rotate files**: "Move" or "Rotate" turns on a drag gizmo — click
   a file, then drag an arrow to translate it or a ring to rotate it. A file
-  moves as one piece; there's no snapping, and it pivots about its own centre.
-  Once you've placed a file by hand, adding more files won't re-flow it. Esc
-  exits.
+  moves as one piece and pivots about its own centre. Translation is free;
+  rotation snaps to 45° steps, so 90° and 180° land exactly. Once you've
+  placed a file by hand, adding more files won't re-flow it. Esc exits.
 - Reset to the original colors at any time.
 - **Render product images**: "Render Image" exports the current camera view as
   a PNG at up to 4K (or 1×/2×/4× the viewport for exact WYSIWYG framing), on a

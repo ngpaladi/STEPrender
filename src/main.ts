@@ -144,7 +144,7 @@ function setTransformMode(mode: TransformMode): void {
   hintEl.textContent =
     mode === 'translate'
       ? 'Click a file, then drag an arrow to move all of it · Esc to finish'
-      : 'Click a file, then drag a ring to rotate all of it · Esc to finish';
+      : 'Click a file, then drag a ring to rotate in 45° steps · Esc to finish';
 
   // Keep working on whatever is already selected rather than making the user
   // re-pick it when switching between move and rotate.
