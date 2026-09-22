@@ -20,6 +20,11 @@ runs locally in your browser.
   part" swatch for quick part-level recoloring.
 - Multi-part STEP assemblies are listed part by part, each collapsible.
 - Reset to the original colors at any time.
+- **Render product images**: "Render Image" exports the current camera view as
+  a PNG at up to 4K (or 1×/2×/4× the viewport for exact WYSIWYG framing), on a
+  studio-gradient, transparent, or viewport background, with an optional
+  shadow under the part. The grid and the selection highlight are excluded, so
+  the output is a clean product shot. A preview appears before you download.
 - Export the recolored model as a `.glb` (glTF binary) to use elsewhere.
 - Drag-and-drop or "Add File(s)" to load one or more models — select or drop
   several files at once (or add them one at a time) to assemble them into a
@@ -69,6 +74,21 @@ like `/STEPrender/` — no extra configuration needed.
   triangles sharing an edge are merged into the same surface if the angle
   between their normals is below a threshold (20° by default). This merges
   the many facets of a curved surface while still splitting at sharp edges.
+
+## Rendering notes
+
+Shading uses an image-based studio environment (three's `RoomEnvironment` via
+PMREM) plus a key/fill light rig, and the Khronos PBR Neutral tone mapper,
+which rolls off highlights without shifting hues — so a surface still reads as
+the color you picked in the sidebar. The light rig, its shadow camera and the
+shadow-catching ground plane are re-fitted to the scene's bounding box on every
+change, because models here range from millimetre parts to metre-scale
+assemblies.
+
+Image export reuses the viewport canvas at a larger drawing-buffer size rather
+than rendering through an offscreen target, so exports match the on-screen
+frame exactly. Requested sizes are clamped to the GPU's maximum texture size
+and to 40 megapixels.
 
 ## Tech stack
 

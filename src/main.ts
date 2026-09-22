@@ -6,6 +6,8 @@ import { HighlightManager } from './ui/Highlight';
 import { loadStepFile } from './loaders/loadStep';
 import { loadStlFile } from './loaders/loadStl';
 import { exportModelAsGlb } from './export/exportGlb';
+import { RenderDialog } from './ui/RenderDialog';
+import { clampRenderSize, renderProductImage } from './render/renderImage';
 import type { SceneDocument, SurfaceInfo } from './model/types';
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
@@ -48,6 +50,31 @@ const sidebar = new Sidebar(modelInfoEl, surfaceListEl, {
   },
 });
 
+function sceneBaseName(): string {
+  if (documents.length === 0) return 'model';
+  if (documents.length === 1) return documents[0].fileName.replace(/\.[^./]+$/, '');
+  return 'assembly';
+}
+
+const renderDialog = new RenderDialog({
+  getViewportSize: () => {
+    const size = viewer.renderer.getSize(new THREE.Vector2());
+    return { width: size.x, height: size.y };
+  },
+  clampSize: (width, height) => clampRenderSize(viewer, width, height),
+  getBaseName: sceneBaseName,
+  render: async (options) => {
+    // The selection glow is a UI affordance, not part of the product shot.
+    highlight.suspend();
+    try {
+      return await renderProductImage(viewer, options);
+    } finally {
+      highlight.restore();
+    }
+  },
+  onError: (message) => showError(message),
+});
+
 function findSurface(partId: string, materialIndex: number): SurfaceInfo | undefined {
   const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
   return part?.surfaces.find((s) => s.materialIndex === materialIndex);
@@ -85,6 +112,7 @@ function updateToolbarState(): void {
   resetBtn.disabled = !hasDocs;
   exportBtn.disabled = !hasDocs;
   clearSceneBtn.disabled = !hasDocs;
+  renderDialog.setEnabled(hasDocs);
 }
 
 /** Rebuilds the three.js scene and sidebar from the current `documents`

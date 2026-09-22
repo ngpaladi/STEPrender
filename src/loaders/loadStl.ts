@@ -48,6 +48,9 @@ export async function loadStlFile(file: File): Promise<LoadedModel> {
       color: new THREE.Color(defaultColorFor(materialIndex)),
       roughness: 0.6,
       metalness: 0.08,
+      // STL winding is frequently inconsistent; render both sides so badly
+      // wound facets don't show up as holes.
+      side: THREE.DoubleSide,
     });
     materials.push(material);
     surfaces.push({

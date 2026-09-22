@@ -16,7 +16,14 @@ function getOcct(): Promise<OcctImportJsInstance> {
 }
 
 function makeMaterial(color: THREE.Color): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.08 });
+  // DoubleSide: exported meshes often carry inconsistent triangle winding, and
+  // a viewer showing holes where faces should be is worse than the small cost.
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.6,
+    metalness: 0.08,
+    side: THREE.DoubleSide,
+  });
 }
 
 function buildPartFromResultMesh(resultMesh: OcctResultMesh, partIndex: number): PartInfo {
