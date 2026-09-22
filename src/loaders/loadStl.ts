@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { LoadedModel, PartInfo, SurfaceInfo } from '../model/types';
 import { defaultColorFor } from '../model/palette';
-import { groupTrianglesIntoSurfaces } from './surfaceGrouping';
+import { computePatchSmoothedNormals, groupTrianglesIntoSurfaces } from './surfaceGrouping';
+import type { PatchRange } from './surfaceGrouping';
 
 const loader = new STLLoader();
 
@@ -34,6 +35,7 @@ export async function loadStlFile(file: File): Promise<LoadedModel> {
   const materials: THREE.MeshStandardMaterial[] = [];
   const surfaces: SurfaceInfo[] = [];
 
+  const patchRanges: PatchRange[] = [];
   let vertexCursor = 0;
   patchOrder.forEach(({ triangles }, materialIndex) => {
     const startVertex = vertexCursor;
@@ -42,7 +44,9 @@ export async function loadStlFile(file: File): Promise<LoadedModel> {
       vertexCursor += 3;
     }
     const vertexCount = triangles.length * 3;
-    geometry.addGroup(startVertex * 3, vertexCount, materialIndex);
+    // Non-indexed geometry: group start/count are vertex counts, not floats.
+    geometry.addGroup(startVertex, vertexCount, materialIndex);
+    patchRanges.push({ startVertex, vertexCount });
 
     const material = new THREE.MeshStandardMaterial({
       color: new THREE.Color(defaultColorFor(materialIndex)),
@@ -63,7 +67,10 @@ export async function loadStlFile(file: File): Promise<LoadedModel> {
   });
 
   geometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
-  geometry.computeVertexNormals();
+  geometry.setAttribute(
+    'normal',
+    new THREE.BufferAttribute(computePatchSmoothedNormals(newPositions, patchRanges), 3),
+  );
 
   const mesh = new THREE.Mesh(geometry, materials.length > 1 ? materials : materials[0]);
   const baseName = file.name.replace(/\.[^./]+$/, '');

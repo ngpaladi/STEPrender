@@ -42,6 +42,32 @@ class UnionFind {
   }
 }
 
+/**
+ * Coincident STL vertices are never bit-identical, so positions are snapped to
+ * a grid derived from the model's own size before being used as a map key.
+ */
+function createVertexKeyFn(positions: Float32Array): (offset: number) => string {
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+  const diagonal = Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) || 1;
+  const eps = diagonal * 1e-5;
+  return (offset: number) => {
+    const x = Math.round(positions[offset] / eps);
+    const y = Math.round(positions[offset + 1] / eps);
+    const z = Math.round(positions[offset + 2] / eps);
+    return `${x}_${y}_${z}`;
+  };
+}
+
 export interface TrianglePatchResult {
   /** For each original triangle index, which patch id it belongs to. */
   patchOf: Int32Array;
@@ -82,28 +108,8 @@ export function groupTrianglesIntoSurfaces(
   // Quantize vertex positions to a grid derived from the model's own scale so
   // coincident STL vertices (which are never exactly bit-identical) hash to
   // the same key.
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i], y = positions[i + 1], z = positions[i + 2];
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (z < minZ) minZ = z;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-    if (z > maxZ) maxZ = z;
-  }
-  const diagonal = Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) || 1;
-  const eps = diagonal * 1e-5;
-  const quant = (v: number) => Math.round(v / eps);
-
   const edgeMap = new Map<string, number[]>();
-  const vertexKey = (i: number) => {
-    const x = quant(positions[i]);
-    const y = quant(positions[i + 1]);
-    const z = quant(positions[i + 2]);
-    return `${x}_${y}_${z}`;
-  };
+  const vertexKey = createVertexKeyFn(positions);
 
   for (let t = 0; t < triangleCount; t++) {
     const base = t * 9;
@@ -168,4 +174,73 @@ export function groupTrianglesIntoSurfaces(
   }
 
   return { patchOf, patches };
+}
+
+export interface PatchRange {
+  startVertex: number;
+  vertexCount: number;
+}
+
+/**
+ * Builds vertex normals that are averaged *within* each surface patch.
+ *
+ * STL stores one normal per facet, which shades a tessellated cylinder as a
+ * row of flat strips. Averaging across the whole mesh would instead round off
+ * genuine edges. Patches are already bounded by sharp edges, so averaging
+ * inside each one — and never across two — gives smooth curves with crisp
+ * edges, the way the same part looks when it arrives as STEP.
+ *
+ * Expects positions ordered so that each patch occupies one contiguous range.
+ */
+export function computePatchSmoothedNormals(
+  positions: Float32Array,
+  patchRanges: PatchRange[],
+): Float32Array {
+  const normals = new Float32Array(positions.length);
+  const vertexKey = createVertexKeyFn(positions);
+
+  for (const { startVertex, vertexCount } of patchRanges) {
+    // Un-normalized face normals accumulate area weighting for free, since
+    // the cross product's length is twice the triangle's area.
+    const accumulated = new Map<string, [number, number, number]>();
+    const endVertex = startVertex + vertexCount;
+
+    for (let v = startVertex; v < endVertex; v += 3) {
+      const a = v * 3;
+      const b = a + 3;
+      const c = a + 6;
+      const ux = positions[b] - positions[a];
+      const uy = positions[b + 1] - positions[a + 1];
+      const uz = positions[b + 2] - positions[a + 2];
+      const vx = positions[c] - positions[a];
+      const vy = positions[c + 1] - positions[a + 1];
+      const vz = positions[c + 2] - positions[a + 2];
+      const nx = uy * vz - uz * vy;
+      const ny = uz * vx - ux * vz;
+      const nz = ux * vy - uy * vx;
+
+      for (const offset of [a, b, c]) {
+        const key = vertexKey(offset);
+        const sum = accumulated.get(key);
+        if (sum) {
+          sum[0] += nx;
+          sum[1] += ny;
+          sum[2] += nz;
+        } else {
+          accumulated.set(key, [nx, ny, nz]);
+        }
+      }
+    }
+
+    for (let v = startVertex; v < endVertex; v++) {
+      const offset = v * 3;
+      const sum = accumulated.get(vertexKey(offset))!;
+      const length = Math.hypot(sum[0], sum[1], sum[2]) || 1;
+      normals[offset] = sum[0] / length;
+      normals[offset + 1] = sum[1] / length;
+      normals[offset + 2] = sum[2] / length;
+    }
+  }
+
+  return normals;
 }
