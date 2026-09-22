@@ -20,6 +20,8 @@ const loadingText = document.getElementById('loading-text') as HTMLElement;
 const resetBtn = document.getElementById('reset-colors-btn') as HTMLButtonElement;
 const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
 const clearSceneBtn = document.getElementById('clear-scene-btn') as HTMLButtonElement;
+const panBtn = document.getElementById('pan-btn') as HTMLButtonElement;
+const fitBtn = document.getElementById('fit-btn') as HTMLButtonElement;
 const moveBtn = document.getElementById('move-btn') as HTMLButtonElement;
 const rotateBtn = document.getElementById('rotate-btn') as HTMLButtonElement;
 const hintEl = document.getElementById('hint') as HTMLElement;
@@ -124,6 +126,7 @@ function updateToolbarState(): void {
   resetBtn.disabled = !hasDocs;
   exportBtn.disabled = !hasDocs;
   clearSceneBtn.disabled = !hasDocs;
+  fitBtn.disabled = !hasDocs;
   moveBtn.disabled = !hasDocs;
   rotateBtn.disabled = !hasDocs;
   renderDialog.setEnabled(hasDocs);
@@ -319,6 +322,11 @@ canvas.addEventListener('pointerup', (e) => {
     pointerDownPos = null;
     return;
   }
+  // The axis widget owns its corner of the canvas.
+  if (viewer.handleViewHelperClick(e)) {
+    pointerDownPos = null;
+    return;
+  }
   if (!pointerDownPos) return;
   const dx = e.clientX - pointerDownPos.x;
   const dy = e.clientY - pointerDownPos.y;
@@ -376,6 +384,17 @@ exportBtn.addEventListener('click', async () => {
 
 clearSceneBtn.addEventListener('click', () => {
   clearScene();
+});
+
+let panning = false;
+panBtn.addEventListener('click', () => {
+  panning = !panning;
+  panBtn.classList.toggle('active', panning);
+  viewer.setPanMode(panning);
+});
+
+fitBtn.addEventListener('click', () => {
+  viewer.frameAll();
 });
 
 moveBtn.addEventListener('click', () => {

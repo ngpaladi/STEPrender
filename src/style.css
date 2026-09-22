@@ -33,6 +33,19 @@ html, body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  /* Without this, click-dragging in the viewport starts a text selection that
+     sweeps across the UI — very easy to trigger with an iPad trackpad. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Form controls still need their own selection behaviour. */
+input,
+select,
+textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 #topbar {
@@ -260,6 +273,8 @@ html, body {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  -webkit-user-drag: none;
 }
 
 #dropzone {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js';
 
 export interface PickResult {
   object: THREE.Mesh;
@@ -23,9 +24,13 @@ export class Viewer {
   /** Invisible plane that catches the key light's shadow. */
   readonly shadowGround: THREE.Mesh;
 
+  /** Corner axis widget; click an axis to swing the camera to that view. */
+  readonly viewHelper: ViewHelper;
+
   private raycaster = new THREE.Raycaster();
   private canvas: HTMLCanvasElement;
   private keyLight: THREE.DirectionalLight;
+  private clock = new THREE.Clock();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -101,6 +106,11 @@ export class Viewer {
     this.modelGroup = new THREE.Group();
     this.scene.add(this.modelGroup);
 
+    this.viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
+    // Sharing the reference keeps the widget orbiting whatever the controls
+    // are currently centred on.
+    this.viewHelper.center = this.controls.target;
+
     window.addEventListener('resize', () => this.handleResize());
     this.handleResize();
 
@@ -109,9 +119,32 @@ export class Viewer {
 
   startLoop(): void {
     this.renderer.setAnimationLoop(() => {
+      const delta = this.clock.getDelta();
+      if (this.viewHelper.animating) this.viewHelper.update(delta);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
+      // Drawn as an overlay after the scene, and only from this loop — so it
+      // never lands in an exported image.
+      this.renderer.autoClear = false;
+      this.viewHelper.render(this.renderer);
+      this.renderer.autoClear = true;
     });
+  }
+
+  /** Returns true when the click was consumed by the axis widget. */
+  handleViewHelperClick(event: PointerEvent): boolean {
+    return this.viewHelper.handleClick(event);
+  }
+
+  /** Swaps left-drag between orbiting and panning, for pointers that have no
+   * comfortable right-drag or two-finger pan (an iPad trackpad, say). */
+  setPanMode(enabled: boolean): void {
+    this.controls.mouseButtons.LEFT = enabled ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    this.controls.touches.ONE = enabled ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+  }
+
+  frameAll(): void {
+    this.frameObject(this.modelGroup);
   }
 
   stopLoop(): void {

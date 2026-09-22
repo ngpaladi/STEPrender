@@ -19,6 +19,11 @@ runs locally in your browser.
 - Per-surface color pickers in the sidebar, plus a "set all surfaces in this
   part" swatch for quick part-level recoloring.
 - Multi-part STEP assemblies are listed part by part, each collapsible.
+- **Navigation**: orbit by dragging, zoom by scrolling. A corner axis widget
+  shows the current orientation — click an axis to swing the camera to that
+  view. "Fit" re-frames everything, and "Pan" switches dragging from orbit to
+  pan, which matters on pointers with no comfortable right-drag or two-finger
+  pan (an iPad trackpad, for instance).
 - **Move and rotate files**: "Move" or "Rotate" turns on a drag gizmo — click
   a file, then drag an arrow to translate it or a ring to rotate it. A file
   moves as one piece and pivots about its own centre. Translation is free;
