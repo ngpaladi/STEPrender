@@ -1,3 +1,4 @@
+import { saveFile } from '../export/saveFile';
 import type { BackgroundStyle, RenderOptions, RenderResult } from '../render/renderImage';
 
 export interface RenderDialogDeps {
@@ -25,10 +26,11 @@ export class RenderDialog {
   private resultModal = document.getElementById('render-result') as HTMLElement;
   private resultImage = document.getElementById('render-image') as HTMLImageElement;
   private resultMeta = document.getElementById('render-meta') as HTMLElement;
-  private downloadLink = document.getElementById('render-download') as HTMLAnchorElement;
+  private downloadBtn = document.getElementById('render-download') as HTMLButtonElement;
   private closeBtn = document.getElementById('render-close') as HTMLButtonElement;
 
   private objectUrl: string | null = null;
+  private lastResult: { blob: Blob; fileName: string } | null = null;
   private deps: RenderDialogDeps;
 
   constructor(deps: RenderDialogDeps) {
@@ -44,6 +46,7 @@ export class RenderDialog {
     this.panel.addEventListener('click', (e) => e.stopPropagation());
 
     this.closeBtn.addEventListener('click', () => this.closeResult());
+    this.downloadBtn.addEventListener('click', () => this.download());
     this.resultModal.addEventListener('click', (e) => {
       if (e.target === this.resultModal) this.closeResult();
     });
@@ -126,11 +129,23 @@ export class RenderDialog {
     this.objectUrl = URL.createObjectURL(result.blob);
 
     const fileName = `${this.deps.getBaseName()}-render.png`;
+    this.lastResult = { blob: result.blob, fileName };
     this.resultImage.src = this.objectUrl;
-    this.downloadLink.href = this.objectUrl;
-    this.downloadLink.download = fileName;
     this.resultMeta.textContent = `${result.width} × ${result.height} px · ${formatBytes(result.blob.size)}`;
     this.resultModal.hidden = false;
+  }
+
+  private async download(): Promise<void> {
+    if (!this.lastResult) return;
+    this.downloadBtn.disabled = true;
+    try {
+      await saveFile(this.lastResult.blob, this.lastResult.fileName);
+    } catch (err) {
+      console.error(err);
+      this.deps.onError(err instanceof Error ? err.message : 'Could not save the image.');
+    } finally {
+      this.downloadBtn.disabled = false;
+    }
   }
 
   private closeResult(): void {
