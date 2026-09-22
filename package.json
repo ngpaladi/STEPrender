@@ -1,0 +1,24 @@
+{
+  "name": "steprender",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Frontend-only STEP/STL 3D viewer with per-surface color editing",
+  "scripts": {
+    "postinstall": "node scripts/copy-occt-wasm.mjs",
+    "predev": "node scripts/copy-occt-wasm.mjs",
+    "prebuild": "node scripts/copy-occt-wasm.mjs",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "occt-import-js": "^0.0.23",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}
