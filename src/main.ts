@@ -7,8 +7,14 @@ import { loadStepFile } from './loaders/loadStep';
 import { loadStlFile } from './loaders/loadStl';
 import { loadGlbFile } from './loaders/loadGlb';
 import { exportModelAsGlb } from './export/exportGlb';
-import { exportSceneAsStep } from './export/exportStep';
 import { RenderDialog } from './ui/RenderDialog';
+import { TextureDialog } from './ui/TextureDialog';
+import {
+  applyTextureTransform,
+  clearSurfaceTexture,
+  loadTextureFromFile,
+  setSurfaceTexture,
+} from './texture/surfaceTexture';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
 import { recenterDocumentOnItself } from './model/recenter';
 import type { LoadedModel, SceneDocument, SurfaceInfo } from './model/types';
@@ -21,7 +27,6 @@ const loadingOverlay = document.getElementById('loading-overlay') as HTMLElement
 const loadingText = document.getElementById('loading-text') as HTMLElement;
 const resetBtn = document.getElementById('reset-colors-btn') as HTMLButtonElement;
 const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
-const exportStepBtn = document.getElementById('export-step-btn') as HTMLButtonElement;
 const clearSceneBtn = document.getElementById('clear-scene-btn') as HTMLButtonElement;
 const panBtn = document.getElementById('pan-btn') as HTMLButtonElement;
 const fitBtn = document.getElementById('fit-btn') as HTMLButtonElement;
@@ -38,6 +43,8 @@ const highlight = new HighlightManager();
 let documents: SceneDocument[] = [];
 let docCounter = 0;
 const meshToPartId = new Map<THREE.Mesh, string>();
+
+let selectedSurface: { partId: string; materialIndex: number } | null = null;
 
 type TransformMode = 'none' | 'translate' | 'rotate';
 let transformMode: TransformMode = 'none';
@@ -91,17 +98,63 @@ const renderDialog = new RenderDialog({
   onError: (message) => showError(message),
 });
 
+const textureDialog = new TextureDialog({
+  getSelected: () => {
+    if (!selectedSurface) return null;
+    const part = findPart(selectedSurface.partId);
+    const surface = findSurface(selectedSurface.partId, selectedSurface.materialIndex);
+    if (!part || !surface) return null;
+    return { surface, label: `${part.name} · ${surface.name}` };
+  },
+  applyImage: async (surface, file) => {
+    const part = selectedSurface ? findPart(selectedSurface.partId) : undefined;
+    if (!part) throw new Error('Select a surface first.');
+    const texture = await loadTextureFromFile(file, viewer.renderer.capabilities.getMaxAnisotropy());
+    setSurfaceTexture(part.mesh, surface, texture, file.name);
+    sidebar.setSwatch(part.id, surface.materialIndex, '#ffffff');
+  },
+  updateTransform: (surface) => {
+    const map = surface.material.map;
+    if (map && surface.texture) applyTextureTransform(map, surface.texture);
+  },
+  removeTexture: (surface) => {
+    clearSurfaceTexture(surface);
+    if (selectedSurface) {
+      sidebar.setSwatch(
+        selectedSurface.partId,
+        surface.materialIndex,
+        `#${surface.originalColor.getHexString()}`,
+      );
+    }
+  },
+  onError: (message) => showError(message),
+});
+
 function findSurface(partId: string, materialIndex: number): SurfaceInfo | undefined {
   const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
   return part?.surfaces.find((s) => s.materialIndex === materialIndex);
 }
 
+function findPart(partId: string) {
+  return documents.flatMap((d) => d.parts).find((p) => p.id === partId);
+}
+
 function selectSurface(partId: string, materialIndex: number): void {
   const surface = findSurface(partId, materialIndex);
   if (!surface) return;
+  selectedSurface = { partId, materialIndex };
   sidebar.select(partId, materialIndex);
   highlight.set(surface.material);
   attachGizmoForPart(partId);
+  textureDialog.setEnabled(true);
+  textureDialog.refresh();
+}
+
+function clearSurfaceSelection(): void {
+  selectedSurface = null;
+  highlight.clear();
+  sidebar.clearSelection();
+  textureDialog.setEnabled(false);
 }
 
 function showError(message: string): void {
@@ -128,7 +181,6 @@ function updateToolbarState(): void {
   const hasDocs = documents.length > 0;
   resetBtn.disabled = !hasDocs;
   exportBtn.disabled = !hasDocs;
-  exportStepBtn.disabled = !hasDocs;
   clearSceneBtn.disabled = !hasDocs;
   fitBtn.disabled = !hasDocs;
   moveBtn.disabled = !hasDocs;
@@ -222,8 +274,7 @@ function removeDocument(docId: string): void {
   if (!doc) return;
   documents = documents.filter((d) => d.docId !== docId);
   userPlacedDocs.delete(docId);
-  highlight.clear();
-  sidebar.clearSelection();
+  clearSurfaceSelection();
   disposeObject3D(doc.root);
   rebuildScene();
 }
@@ -231,8 +282,7 @@ function removeDocument(docId: string): void {
 function clearScene(): void {
   documents = [];
   userPlacedDocs.clear();
-  highlight.clear();
-  sidebar.clearSelection();
+  clearSurfaceSelection();
   rebuildScene();
 }
 
@@ -263,8 +313,7 @@ async function loadOneFile(file: File): Promise<SceneDocument | null> {
 async function handleFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
 
-  highlight.clear();
-  sidebar.clearSelection();
+  clearSurfaceSelection();
 
   let loadedAny = false;
   for (let i = 0; i < files.length; i++) {
@@ -370,8 +419,10 @@ resetBtn.addEventListener('click', () => {
   for (const doc of documents) {
     for (const part of doc.parts) {
       for (const surface of part.surfaces) {
-        surface.material.color.copy(surface.originalColor);
-        sidebar.setSwatch(part.id, surface.materialIndex, `#${surface.originalColor.getHexString()}`);
+        // A textured surface stays white, since the base color tints the map.
+        const reset = surface.texture ? new THREE.Color(0xffffff) : surface.originalColor;
+        surface.material.color.copy(reset);
+        sidebar.setSwatch(part.id, surface.materialIndex, `#${reset.getHexString()}`);
       }
     }
   }
@@ -391,22 +442,6 @@ exportBtn.addEventListener('click', async () => {
   } finally {
     exportBtn.disabled = false;
     exportBtn.textContent = prevLabel ?? 'Export GLB';
-  }
-});
-
-exportStepBtn.addEventListener('click', async () => {
-  if (documents.length === 0) return;
-  exportStepBtn.disabled = true;
-  const prevLabel = exportStepBtn.textContent;
-  exportStepBtn.textContent = 'Writing…';
-  try {
-    await exportSceneAsStep(documents, sceneBaseName());
-  } catch (err) {
-    console.error(err);
-    showError(err instanceof Error ? err.message : 'Failed to write the STEP file.');
-  } finally {
-    exportStepBtn.disabled = false;
-    exportStepBtn.textContent = prevLabel ?? 'Export STEP';
   }
 });
 

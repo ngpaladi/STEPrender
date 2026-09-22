@@ -20,9 +20,9 @@
           <button id="fit-btn" class="btn" disabled title="Frame everything in the scene">Fit</button>
           <button id="move-btn" class="btn" disabled title="Drag to move a whole file">Move</button>
           <button id="rotate-btn" class="btn" disabled title="Drag to rotate a whole file in 45° steps">Rotate</button>
+          <button id="texture-btn" class="btn" disabled title="Apply an image to the selected surface">Texture</button>
           <button id="reset-colors-btn" class="btn" disabled>Reset Colors</button>
           <button id="export-btn" class="btn" disabled>Export GLB</button>
-          <button id="export-step-btn" class="btn" disabled title="Combined STEP file with colors (faceted geometry)">Export STEP</button>
           <button id="clear-scene-btn" class="btn" disabled>Clear Scene</button>
           <button id="render-btn" class="btn btn-primary" disabled>Render Image</button>
         </div>
@@ -62,6 +62,29 @@
           <div class="popover-actions">
             <button class="btn" id="render-cancel">Cancel</button>
             <button class="btn btn-primary" id="render-go">Render</button>
+          </div>
+        </div>
+        <div id="texture-panel" class="popover" hidden>
+          <h3 class="popover-title">Surface Texture</h3>
+          <p class="field-note" id="texture-target">No surface selected</p>
+          <label class="btn texture-pick" for="texture-input">Choose image…</label>
+          <input id="texture-input" type="file" accept="image/*" hidden />
+          <div id="texture-current" hidden>
+            <div class="texture-preview"><img id="texture-thumb" alt="Selected texture" /></div>
+            <label class="field">
+              <span class="field-label">Sizing</span>
+              <select id="texture-mode">
+                <option value="tile" selected>Tile at size</option>
+                <option value="fit">Full size (fit to surface)</option>
+              </select>
+            </label>
+            <label class="field" id="texture-scale-field">
+              <span class="field-label">Tile size (model units)</span>
+              <input id="texture-scale" type="number" min="0.001" step="any" />
+            </label>
+            <div class="popover-actions">
+              <button class="btn" id="texture-remove">Remove</button>
+            </div>
           </div>
         </div>
       </header>

@@ -1,5 +1,18 @@
 import * as THREE from 'three';
 
+export interface SurfaceTexture {
+  /** 'tile' repeats every `scale` model units; 'fit' spans the surface once. */
+  mode: 'tile' | 'fit';
+  /** Model units covered by one tile, in tile mode. */
+  scale: number;
+  /** Planar projection extent of the surface, in model units. */
+  minU: number;
+  minV: number;
+  extentU: number;
+  extentV: number;
+  sourceName: string;
+}
+
 export interface SurfaceInfo {
   /** index into the owning mesh's material array */
   materialIndex: number;
@@ -10,6 +23,8 @@ export interface SurfaceInfo {
   material: THREE.MeshStandardMaterial;
   /** original color, used for reset */
   originalColor: THREE.Color;
+  /** present only while an image texture is applied to this surface */
+  texture?: SurfaceTexture;
 }
 
 export interface PartInfo {

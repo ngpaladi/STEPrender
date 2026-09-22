@@ -34,6 +34,10 @@ runs locally in your browser.
   moves as one piece and pivots about its own centre. Translation is free;
   rotation snaps to 45° steps, so 90° and 180° land exactly. Once you've
   placed a file by hand, adding more files won't re-flow it. Esc exits.
+- **Image textures per surface**: select a surface, open "Texture" and choose
+  an image. Either tile it at a chosen size in model units, or use full size
+  to fit exactly one copy to that surface. Each surface keeps its own image
+  and sizing, and textures show up in rendered images and GLB exports.
 - Reset to the original colors at any time.
 - **Render product images**: "Render Image" exports the current camera view as
   a PNG at up to 4K (or 1×/2×/4× the viewport for exact WYSIWYG framing), on a
@@ -41,9 +45,6 @@ runs locally in your browser.
   shadow under the part. The grid and the selection highlight are excluded, so
   the output is a clean product shot. A preview appears before you download.
 - Export the recolored model as a `.glb` (glTF binary) to use elsewhere.
-- **Export STEP**: writes everything loaded as one combined `.step` file with
-  the per-surface colors and your arrangement baked in. Note the tradeoff
-  below — the geometry is faceted.
 - Drag-and-drop or "Add File(s)" to load one or more models (.step/.stp/.stl/.glb) — select or drop
   several files at once (or add them one at a time) to assemble them into a
   single scene. Each file gets its own section in the sidebar with a remove
@@ -97,22 +98,19 @@ Those patches double as smoothing groups: vertex normals are averaged within
 each patch and never across two, so a tessellated cylinder shades smoothly
 while its rim stays crisp, matching how the same part looks as STEP.
 
-## STEP export: what you get, and what you lose
+## How texturing works
 
-The loader tessellates to triangles and discards the B-rep, and
-`occt-import-js` only reads STEP — so the exporter writes what's actually in
-memory: every triangle becomes a planar `ADVANCED_FACE` inside a
-`MANIFOLD_SOLID_BREP`, one solid per part, with world transforms baked into
-the coordinates and per-surface colors attached as `STYLED_ITEM`s.
+None of these formats supply UVs — STEP and STL have no notion of them, and a
+GLB may or may not — so a surface's UVs are generated on demand by projecting
+its vertices onto a plane perpendicular to its (area-weighted) average normal.
+The projection is in model units, which lets both sizing modes be expressed
+purely as a texture transform: tiling divides by the tile size, full size
+divides by the surface's own extent and offsets it to the surface's origin.
 
-That means the file opens in CAD, keeps each part as its own body, and carries
-your colors and arrangement — but curved surfaces stay faceted, every triangle
-shows up as its own face, and files are much larger than the original. For
-exact CAD surfaces, the source STEP is still the source of truth.
-
-Correctness is verified by round-tripping: the exported file is read back with
-OpenCascade and must return the same face count, the same triangle count, and
-the same colors.
+Writing UVs per surface is safe because each surface's vertices belong to it
+alone — OCCT meshes every face separately, and the STL loader reorders
+triangles so patches are contiguous — so texturing one surface never disturbs
+a neighbour's mapping.
 
 ## Rendering notes
 

@@ -278,6 +278,8 @@ export function disposeObject3D(object: THREE.Object3D): void {
       child.geometry.dispose();
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       for (const mat of materials) {
+        // Disposing a material does not release the textures it references.
+        (mat as THREE.MeshStandardMaterial).map?.dispose();
         mat.dispose();
       }
     }
