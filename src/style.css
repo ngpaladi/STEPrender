@@ -79,6 +79,12 @@ html, body {
   cursor: not-allowed;
 }
 
+.btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);

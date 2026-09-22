@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export interface PickResult {
@@ -13,6 +14,9 @@ export class Viewer {
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
+  readonly transformControls: TransformControls;
+  /** The gizmo's drawable half; kept out of exported images. */
+  readonly transformHelper: THREE.Object3D;
   readonly modelGroup: THREE.Group;
   /** Ground grid, hidden for clean product renders. */
   readonly grid: THREE.GridHelper;
@@ -51,6 +55,17 @@ export class Viewer {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
+
+    // Snapping stays off (translationSnap/rotationSnap default to null) so
+    // parts move freely.
+    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.transformControls.addEventListener('dragging-changed', (event) => {
+      // Orbiting while dragging the gizmo would fight the drag.
+      this.controls.enabled = !(event as unknown as { value: boolean }).value;
+    });
+    this.transformHelper = this.transformControls.getHelper();
+    this.transformHelper.visible = false;
+    this.scene.add(this.transformHelper);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -179,6 +194,25 @@ export class Viewer {
 
     this.shadowGround.position.set(center.x, box.min.y, center.z);
     this.shadowGround.scale.setScalar(Math.max(radius * 8, 1e-6));
+  }
+
+  attachGizmo(object: THREE.Object3D, mode: 'translate' | 'rotate'): void {
+    this.transformControls.setMode(mode);
+    this.transformControls.attach(object);
+    this.transformHelper.visible = true;
+  }
+
+  detachGizmo(): void {
+    this.transformControls.detach();
+    this.transformHelper.visible = false;
+  }
+
+  get gizmoTarget(): THREE.Object3D | undefined {
+    return this.transformControls.object;
+  }
+
+  get isGizmoDragging(): boolean {
+    return this.transformControls.dragging;
   }
 
   /** Raycast from a pointer event (client coords) against the model group. */

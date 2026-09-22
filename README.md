@@ -19,6 +19,10 @@ runs locally in your browser.
 - Per-surface color pickers in the sidebar, plus a "set all surfaces in this
   part" swatch for quick part-level recoloring.
 - Multi-part STEP assemblies are listed part by part, each collapsible.
+- **Move and rotate parts**: "Move" or "Rotate" turns on a drag gizmo — click
+  a part, then drag an arrow to translate it or a ring to rotate it. There's
+  no snapping, and parts pivot about their own centre. Once you've placed a
+  file by hand, adding more files won't re-flow it. Esc exits.
 - Reset to the original colors at any time.
 - **Render product images**: "Render Image" exports the current camera view as
   a PNG at up to 4K (or 1×/2×/4× the viewport for exact WYSIWYG framing), on a
@@ -74,6 +78,10 @@ like `/STEPrender/` — no extra configuration needed.
   triangles sharing an edge are merged into the same surface if the angle
   between their normals is below a threshold (20° by default). This merges
   the many facets of a curved surface while still splitting at sharp edges.
+
+Those patches double as smoothing groups: vertex normals are averaged within
+each patch and never across two, so a tessellated cylinder shades smoothly
+while its rim stays crisp, matching how the same part looks as STEP.
 
 ## Rendering notes
 

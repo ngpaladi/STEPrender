@@ -8,6 +8,7 @@ import { loadStlFile } from './loaders/loadStl';
 import { exportModelAsGlb } from './export/exportGlb';
 import { RenderDialog } from './ui/RenderDialog';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
+import { recenterGeometryOnItself } from './model/recenter';
 import type { SceneDocument, SurfaceInfo } from './model/types';
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
@@ -19,6 +20,9 @@ const loadingText = document.getElementById('loading-text') as HTMLElement;
 const resetBtn = document.getElementById('reset-colors-btn') as HTMLButtonElement;
 const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
 const clearSceneBtn = document.getElementById('clear-scene-btn') as HTMLButtonElement;
+const moveBtn = document.getElementById('move-btn') as HTMLButtonElement;
+const rotateBtn = document.getElementById('rotate-btn') as HTMLButtonElement;
+const hintEl = document.getElementById('hint') as HTMLElement;
 const modelInfoEl = document.getElementById('model-info') as HTMLElement;
 const surfaceListEl = document.getElementById('surface-list') as HTMLElement;
 
@@ -29,6 +33,14 @@ const highlight = new HighlightManager();
 let documents: SceneDocument[] = [];
 let docCounter = 0;
 const meshToPartId = new Map<THREE.Mesh, string>();
+const meshToDocId = new Map<THREE.Mesh, string>();
+
+type TransformMode = 'none' | 'translate' | 'rotate';
+let transformMode: TransformMode = 'none';
+/** Files the user has moved by hand; auto-layout leaves these where they are. */
+const userPlacedDocs = new Set<string>();
+
+const DEFAULT_HINT = hintEl.textContent ?? '';
 
 const sidebar = new Sidebar(modelInfoEl, surfaceListEl, {
   onSurfaceColorInput: (partId, materialIndex, hex) => {
@@ -85,6 +97,7 @@ function selectSurface(partId: string, materialIndex: number): void {
   if (!surface) return;
   sidebar.select(partId, materialIndex);
   highlight.set(surface.material);
+  attachGizmoToPart(partId);
 }
 
 function showError(message: string): void {
@@ -112,19 +125,53 @@ function updateToolbarState(): void {
   resetBtn.disabled = !hasDocs;
   exportBtn.disabled = !hasDocs;
   clearSceneBtn.disabled = !hasDocs;
+  moveBtn.disabled = !hasDocs;
+  rotateBtn.disabled = !hasDocs;
   renderDialog.setEnabled(hasDocs);
+  if (!hasDocs) setTransformMode('none');
+}
+
+function setTransformMode(mode: TransformMode): void {
+  transformMode = mode;
+  moveBtn.classList.toggle('active', mode === 'translate');
+  rotateBtn.classList.toggle('active', mode === 'rotate');
+
+  if (mode === 'none') {
+    viewer.detachGizmo();
+    hintEl.textContent = DEFAULT_HINT;
+    return;
+  }
+
+  hintEl.textContent =
+    mode === 'translate'
+      ? 'Click a part, then drag an arrow to move it · Esc to finish'
+      : 'Click a part, then drag a ring to rotate it · Esc to finish';
+
+  // Keep working on whatever is already selected rather than making the user
+  // re-pick it when switching between move and rotate.
+  const target = viewer.gizmoTarget;
+  if (target) viewer.attachGizmo(target, mode);
+}
+
+function attachGizmoToPart(partId: string): void {
+  if (transformMode === 'none') return;
+  const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
+  if (part) viewer.attachGizmo(part.mesh, transformMode);
 }
 
 /** Rebuilds the three.js scene and sidebar from the current `documents`
  * list, and reframes the camera around everything that's loaded. */
 function rebuildScene(refreshSidebar = true): void {
   layoutDocuments();
+  viewer.detachGizmo();
   viewer.clearModel();
   meshToPartId.clear();
+  meshToDocId.clear();
   for (const doc of documents) {
     viewer.addModel(doc.root);
     for (const part of doc.parts) {
       meshToPartId.set(part.mesh, part.id);
+      meshToDocId.set(part.mesh, doc.docId);
     }
   }
   viewer.frameObject(viewer.modelGroup);
@@ -139,6 +186,18 @@ function rebuildScene(refreshSidebar = true): void {
 function layoutDocuments(): void {
   let cursorX = 0;
   for (const doc of documents) {
+    if (userPlacedDocs.has(doc.docId)) {
+      // Hand-placed: leave it exactly where it was put, but still reserve the
+      // space it occupies so auto-placed files don't land on top of it.
+      doc.root.updateMatrixWorld(true);
+      const placedBox = new THREE.Box3().setFromObject(doc.root);
+      if (!placedBox.isEmpty()) {
+        const placedSize = placedBox.getSize(new THREE.Vector3());
+        cursorX = Math.max(cursorX, placedBox.max.x + Math.max(placedSize.length() * 0.2, 1e-6));
+      }
+      continue;
+    }
+
     doc.root.position.set(0, 0, 0);
     doc.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(doc.root);
@@ -157,6 +216,7 @@ function removeDocument(docId: string): void {
   const doc = documents.find((d) => d.docId === docId);
   if (!doc) return;
   documents = documents.filter((d) => d.docId !== docId);
+  userPlacedDocs.delete(docId);
   highlight.clear();
   sidebar.clearSelection();
   disposeObject3D(doc.root);
@@ -165,6 +225,7 @@ function removeDocument(docId: string): void {
 
 function clearScene(): void {
   documents = [];
+  userPlacedDocs.clear();
   highlight.clear();
   sidebar.clearSelection();
   rebuildScene();
@@ -181,6 +242,7 @@ async function loadOneFile(file: File): Promise<SceneDocument | null> {
   const docId = `doc-${docCounter++}`;
   for (const part of model.parts) {
     part.id = `${docId}::${part.id}`;
+    recenterGeometryOnItself(part.mesh);
   }
   return { ...model, docId };
 }
@@ -255,6 +317,10 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointerup', (e) => {
+  if (viewer.isGizmoDragging) {
+    pointerDownPos = null;
+    return;
+  }
   if (!pointerDownPos) return;
   const dx = e.clientX - pointerDownPos.x;
   const dy = e.clientY - pointerDownPos.y;
@@ -312,6 +378,27 @@ exportBtn.addEventListener('click', async () => {
 
 clearSceneBtn.addEventListener('click', () => {
   clearScene();
+});
+
+moveBtn.addEventListener('click', () => {
+  setTransformMode(transformMode === 'translate' ? 'none' : 'translate');
+});
+
+rotateBtn.addEventListener('click', () => {
+  setTransformMode(transformMode === 'rotate' ? 'none' : 'rotate');
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && transformMode !== 'none') setTransformMode('none');
+});
+
+// A part that's been moved by hand pins its whole file, so the next file
+// added to the scene doesn't re-flow it back into the row.
+viewer.transformControls.addEventListener('objectChange', () => {
+  const target = viewer.gizmoTarget;
+  if (!(target instanceof THREE.Mesh)) return;
+  const docId = meshToDocId.get(target);
+  if (docId) userPlacedDocs.add(docId);
 });
 
 sidebar.showEmpty();

@@ -87,6 +87,7 @@ export async function renderProductImage(
   const prevClearAlpha = renderer.getClearAlpha();
   const prevGridVisible = viewer.grid.visible;
   const prevShadowVisible = viewer.shadowGround.visible;
+  const prevGizmoVisible = viewer.transformHelper.visible;
 
   let gradientTexture: THREE.CanvasTexture | null = null;
 
@@ -97,6 +98,7 @@ export async function renderProductImage(
   try {
     viewer.grid.visible = options.showGrid;
     viewer.shadowGround.visible = options.showShadow;
+    viewer.transformHelper.visible = false;
 
     if (options.background === 'transparent') {
       scene.background = null;
@@ -120,6 +122,7 @@ export async function renderProductImage(
     renderer.setClearAlpha(prevClearAlpha);
     viewer.grid.visible = prevGridVisible;
     viewer.shadowGround.visible = prevShadowVisible;
+    viewer.transformHelper.visible = prevGizmoVisible;
     renderer.setPixelRatio(prevPixelRatio);
     renderer.setSize(prevSize.x, prevSize.y, false);
     camera.aspect = prevAspect;
