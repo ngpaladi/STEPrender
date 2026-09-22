@@ -1,20 +1,25 @@
 import * as THREE from 'three';
+import type { PartInfo } from './types';
 
 /**
- * Moves a part's geometry so its origin sits at the centre of its own bounding
- * box, compensating with the mesh's position so nothing moves on screen.
+ * Shifts a file's parts so the root's origin sits at the centre of everything
+ * the file contains, leaving their positions relative to each other untouched.
  *
  * Source files put the origin wherever the authoring tool did — often at an
- * assembly datum well outside the part. The transform gizmo pivots on the
- * object's origin, so without this a rotation swings the part through an arc
- * instead of turning it in place.
+ * assembly datum well outside the geometry. The transform gizmo pivots on the
+ * object's origin, so without this a rotation swings the whole file through an
+ * arc instead of turning it in place.
+ *
+ * Call this while the root still has an identity transform, before layout.
  */
-export function recenterGeometryOnItself(mesh: THREE.Mesh): void {
-  mesh.geometry.computeBoundingBox();
-  const box = mesh.geometry.boundingBox;
-  if (!box) return;
+export function recenterDocumentOnItself(root: THREE.Object3D, parts: PartInfo[]): void {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return;
 
   const center = box.getCenter(new THREE.Vector3());
-  mesh.geometry.translate(-center.x, -center.y, -center.z);
-  mesh.position.add(center);
+  for (const part of parts) {
+    part.mesh.position.sub(center);
+  }
+  root.updateMatrixWorld(true);
 }

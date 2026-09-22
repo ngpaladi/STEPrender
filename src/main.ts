@@ -8,7 +8,7 @@ import { loadStlFile } from './loaders/loadStl';
 import { exportModelAsGlb } from './export/exportGlb';
 import { RenderDialog } from './ui/RenderDialog';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
-import { recenterGeometryOnItself } from './model/recenter';
+import { recenterDocumentOnItself } from './model/recenter';
 import type { SceneDocument, SurfaceInfo } from './model/types';
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
@@ -33,7 +33,6 @@ const highlight = new HighlightManager();
 let documents: SceneDocument[] = [];
 let docCounter = 0;
 const meshToPartId = new Map<THREE.Mesh, string>();
-const meshToDocId = new Map<THREE.Mesh, string>();
 
 type TransformMode = 'none' | 'translate' | 'rotate';
 let transformMode: TransformMode = 'none';
@@ -97,7 +96,7 @@ function selectSurface(partId: string, materialIndex: number): void {
   if (!surface) return;
   sidebar.select(partId, materialIndex);
   highlight.set(surface.material);
-  attachGizmoToPart(partId);
+  attachGizmoForPart(partId);
 }
 
 function showError(message: string): void {
@@ -144,8 +143,8 @@ function setTransformMode(mode: TransformMode): void {
 
   hintEl.textContent =
     mode === 'translate'
-      ? 'Click a part, then drag an arrow to move it · Esc to finish'
-      : 'Click a part, then drag a ring to rotate it · Esc to finish';
+      ? 'Click a file, then drag an arrow to move all of it · Esc to finish'
+      : 'Click a file, then drag a ring to rotate all of it · Esc to finish';
 
   // Keep working on whatever is already selected rather than making the user
   // re-pick it when switching between move and rotate.
@@ -153,10 +152,11 @@ function setTransformMode(mode: TransformMode): void {
   if (target) viewer.attachGizmo(target, mode);
 }
 
-function attachGizmoToPart(partId: string): void {
+/** The gizmo moves a whole file, so a click anywhere on it grabs its root. */
+function attachGizmoForPart(partId: string): void {
   if (transformMode === 'none') return;
-  const part = documents.flatMap((d) => d.parts).find((p) => p.id === partId);
-  if (part) viewer.attachGizmo(part.mesh, transformMode);
+  const doc = documents.find((d) => d.parts.some((p) => p.id === partId));
+  if (doc) viewer.attachGizmo(doc.root, transformMode);
 }
 
 /** Rebuilds the three.js scene and sidebar from the current `documents`
@@ -166,12 +166,10 @@ function rebuildScene(refreshSidebar = true): void {
   viewer.detachGizmo();
   viewer.clearModel();
   meshToPartId.clear();
-  meshToDocId.clear();
   for (const doc of documents) {
     viewer.addModel(doc.root);
     for (const part of doc.parts) {
       meshToPartId.set(part.mesh, part.id);
-      meshToDocId.set(part.mesh, doc.docId);
     }
   }
   viewer.frameObject(viewer.modelGroup);
@@ -242,8 +240,8 @@ async function loadOneFile(file: File): Promise<SceneDocument | null> {
   const docId = `doc-${docCounter++}`;
   for (const part of model.parts) {
     part.id = `${docId}::${part.id}`;
-    recenterGeometryOnItself(part.mesh);
   }
+  recenterDocumentOnItself(model.root, model.parts);
   return { ...model, docId };
 }
 
@@ -392,13 +390,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && transformMode !== 'none') setTransformMode('none');
 });
 
-// A part that's been moved by hand pins its whole file, so the next file
-// added to the scene doesn't re-flow it back into the row.
+// A file that's been placed by hand stays put, so the next file added to the
+// scene doesn't re-flow it back into the row.
 viewer.transformControls.addEventListener('objectChange', () => {
   const target = viewer.gizmoTarget;
-  if (!(target instanceof THREE.Mesh)) return;
-  const docId = meshToDocId.get(target);
-  if (docId) userPlacedDocs.add(docId);
+  if (!target) return;
+  const doc = documents.find((d) => d.root === target);
+  if (doc) userPlacedDocs.add(doc.docId);
 });
 
 sidebar.showEmpty();
