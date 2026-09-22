@@ -36,6 +36,9 @@ runs locally in your browser.
   shadow under the part. The grid and the selection highlight are excluded, so
   the output is a clean product shot. A preview appears before you download.
 - Export the recolored model as a `.glb` (glTF binary) to use elsewhere.
+- **Export STEP**: writes everything loaded as one combined `.step` file with
+  the per-surface colors and your arrangement baked in. Note the tradeoff
+  below — the geometry is faceted.
 - Drag-and-drop or "Add File(s)" to load one or more models — select or drop
   several files at once (or add them one at a time) to assemble them into a
   single scene. Each file gets its own section in the sidebar with a remove
@@ -88,6 +91,23 @@ like `/STEPrender/` — no extra configuration needed.
 Those patches double as smoothing groups: vertex normals are averaged within
 each patch and never across two, so a tessellated cylinder shades smoothly
 while its rim stays crisp, matching how the same part looks as STEP.
+
+## STEP export: what you get, and what you lose
+
+The loader tessellates to triangles and discards the B-rep, and
+`occt-import-js` only reads STEP — so the exporter writes what's actually in
+memory: every triangle becomes a planar `ADVANCED_FACE` inside a
+`MANIFOLD_SOLID_BREP`, one solid per part, with world transforms baked into
+the coordinates and per-surface colors attached as `STYLED_ITEM`s.
+
+That means the file opens in CAD, keeps each part as its own body, and carries
+your colors and arrangement — but curved surfaces stay faceted, every triangle
+shows up as its own face, and files are much larger than the original. For
+exact CAD surfaces, the source STEP is still the source of truth.
+
+Correctness is verified by round-tripping: the exported file is read back with
+OpenCascade and must return the same face count, the same triangle count, and
+the same colors.
 
 ## Rendering notes
 

@@ -6,6 +6,7 @@ import { HighlightManager } from './ui/Highlight';
 import { loadStepFile } from './loaders/loadStep';
 import { loadStlFile } from './loaders/loadStl';
 import { exportModelAsGlb } from './export/exportGlb';
+import { exportSceneAsStep } from './export/exportStep';
 import { RenderDialog } from './ui/RenderDialog';
 import { clampRenderSize, renderProductImage } from './render/renderImage';
 import { recenterDocumentOnItself } from './model/recenter';
@@ -19,6 +20,7 @@ const loadingOverlay = document.getElementById('loading-overlay') as HTMLElement
 const loadingText = document.getElementById('loading-text') as HTMLElement;
 const resetBtn = document.getElementById('reset-colors-btn') as HTMLButtonElement;
 const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
+const exportStepBtn = document.getElementById('export-step-btn') as HTMLButtonElement;
 const clearSceneBtn = document.getElementById('clear-scene-btn') as HTMLButtonElement;
 const panBtn = document.getElementById('pan-btn') as HTMLButtonElement;
 const fitBtn = document.getElementById('fit-btn') as HTMLButtonElement;
@@ -125,6 +127,7 @@ function updateToolbarState(): void {
   const hasDocs = documents.length > 0;
   resetBtn.disabled = !hasDocs;
   exportBtn.disabled = !hasDocs;
+  exportStepBtn.disabled = !hasDocs;
   clearSceneBtn.disabled = !hasDocs;
   fitBtn.disabled = !hasDocs;
   moveBtn.disabled = !hasDocs;
@@ -379,6 +382,22 @@ exportBtn.addEventListener('click', async () => {
   } finally {
     exportBtn.disabled = false;
     exportBtn.textContent = prevLabel ?? 'Export GLB';
+  }
+});
+
+exportStepBtn.addEventListener('click', async () => {
+  if (documents.length === 0) return;
+  exportStepBtn.disabled = true;
+  const prevLabel = exportStepBtn.textContent;
+  exportStepBtn.textContent = 'Writing…';
+  try {
+    await exportSceneAsStep(documents, sceneBaseName());
+  } catch (err) {
+    console.error(err);
+    showError(err instanceof Error ? err.message : 'Failed to write the STEP file.');
+  } finally {
+    exportStepBtn.disabled = false;
+    exportStepBtn.textContent = prevLabel ?? 'Export STEP';
   }
 });
 
